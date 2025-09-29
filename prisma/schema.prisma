@@ -1,0 +1,283 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================== ENUMS ==================
+enum RoleCode {
+  OWNER
+  ADMIN
+  MANAGER
+  CASHIER
+  KITCHEN
+  VIEWER
+}
+
+enum ThemeMode {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum Density {
+  COMPACT
+  COMFORTABLE
+}
+
+enum DnsStatus {
+  NOT_VERIFIED
+  VERIFYING
+  VERIFIED
+  FAILED
+}
+
+enum PlanCode {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum InvoiceStatus {
+  PAID
+  PAST_DUE
+  REFUNDED
+  VOID
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum SsoProvider {
+  DISABLED
+  GOOGLE
+  OAUTH_
+  SAML
+  OKTA
+  AZUREAD
+}
+
+// ================== CORE ===================
+model Tenant {
+  id        String   @id @default(uuid())
+  key       String   @unique // "alpha", "bravo" (subdomain-safe)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 1:1 settings sections
+  brand        TenantBrand?
+  theme        TenantTheme?
+  domain       TenantDomain?
+  billing      TenantBilling?
+  integrations TenantIntegrations?
+  security     TenantSecurity?
+  i18n         TenantLocalization?
+  compliance   TenantCompliance?
+
+  memberships          Membership[]
+  invoices             Invoice[]
+  apiKeys              ApiKey[]
+  auditLogs            AuditLog[]
+  TenantRolePermission TenantRolePermission[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  passwordHash String? 
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  auditLogs   AuditLog[]
+  ApiKey      ApiKey[]
+}
+
+model Membership {
+  id       String   @id @default(uuid())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  role     RoleCode
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+// ================== SETTINGS: APPEARANCE ===================
+model TenantBrand {
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String   @id
+  brandName String?
+  primary   String? // hex
+  accent    String? // hex
+  logoUrl   String? // CDN path
+  updatedAt DateTime @updatedAt
+}
+
+model TenantTheme {
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String     @id
+  mode      ThemeMode? @default(SYSTEM)
+  density   Density?   @default(COMFORTABLE)
+  font      String? // "Inter", "IBM Plex Sans" (opsional)
+  updatedAt DateTime   @updatedAt
+}
+
+// ================== SETTINGS: DOMAIN ======================
+model TenantDomain {
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId   String    @id
+  domain     String?   @unique
+  dnsStatus  DnsStatus @default(NOT_VERIFIED)
+  autoHttps  Boolean   @default(true)
+  verifiedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+}
+
+// ================== SETTINGS: BILLING =====================
+model TenantBilling {
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId        String         @id
+  plan            PlanCode       @default(FREE)
+  paymentMethodId String?
+  paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  updatedAt       DateTime       @updatedAt
+}
+
+model PaymentMethod {
+  id            String          @id @default(uuid())
+  brand         String? // "visa", "mastercard"
+  last4         String?
+  expMonth      Int?
+  expYear       Int?
+  tokenRef      String? // reference ke vault/gateway
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  TenantBilling TenantBilling[]
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  number      String        @unique // INV-2025-0001
+  periodStart DateTime
+  periodEnd   DateTime
+  amountCents Int
+  currency    String // "IDR","USD"
+  status      InvoiceStatus
+  pdfUrl      String?
+  createdAt   DateTime      @default(now())
+
+  @@index([tenantId, status])
+}
+
+// ================== SETTINGS: INTEGRATIONS =================
+model TenantIntegrations {
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId      String   @id
+  slackEnabled  Boolean  @default(false)
+  zapierEnabled Boolean  @default(false)
+  webhookUrl    String?
+  updatedAt     DateTime @updatedAt
+}
+
+// ================== SETTINGS: SECURITY / SSO ===============
+model TenantSecurity {
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId       String      @id
+  enforceMfa     Boolean     @default(false)
+  ssoProvider    SsoProvider @default(DISABLED)
+  allowedDomains String[] // ["alphacoffee.com","partner.co"]
+  updatedAt      DateTime    @updatedAt
+}
+
+// ================== SETTINGS: ROLES & PERMISSIONS =========
+// Matrix per-tenant: role ↔ permission
+enum Perm {
+  ORDERS_READ
+  ORDERS_UPDATE
+  MENU_MANAGE
+  USERS_MANAGE
+  // tambah sesuai kebutuhan (LOYALTY_READ, PAYMENTS_REFUND, dll)
+}
+
+model TenantRolePermission {
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  role     RoleCode
+  perm     Perm
+
+  @@id([tenantId, role, perm])
+  @@index([tenantId, role])
+}
+
+// ================== SETTINGS: LOCALIZATION =================
+model TenantLocalization {
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String   @id
+  language  String? // "id-ID"
+  timezone  String? // "Asia/Jakarta"
+  currency  String? // "IDR"
+  updatedAt DateTime @updatedAt
+}
+
+// ================== SETTINGS: DATA & COMPLIANCE ===========
+model TenantCompliance {
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId      String   @id
+  retentionDays Int      @default(90)
+  updatedAt     DateTime @updatedAt
+}
+
+// ================== SETTINGS: API KEYS =====================
+model ApiKey {
+  id          String       @id @default(uuid())
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  name        String? // label di UI
+  keyPrefix   String // "pub_" atau "sec_" prefix utk display
+  secretHash  String // simpan hash, bukan plaintext
+  status      ApiKeyStatus @default(ACTIVE)
+  createdById String?
+  createdBy   User?        @relation(fields: [createdById], references: [id])
+  lastUsedAt  DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([tenantId, status])
+}
+
+// ================== AUDIT LOG ==============================
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String
+  actor     User?    @relation(fields: [actorId], references: [id])
+  actorId   String?
+  action    String // "SETTINGS.UPDATE", "ROLE.MATRIX.SET", etc.
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
