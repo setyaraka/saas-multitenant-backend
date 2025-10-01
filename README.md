@@ -74,7 +74,7 @@ model TenantConfig {
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
 }
 ```
-## 🔌 Main Endpoints
+## Main Endpoints
 ### Auth
 
 - POST /auth/register → register a new user and assign them to a tenant.
