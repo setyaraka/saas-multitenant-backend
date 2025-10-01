@@ -61,7 +61,7 @@ export class TenantsController {
   @Roles('OWNER', 'ADMIN')
   @Get(':tenantId/settings')
   getTenantSettings(@Param('tenantId') tenantId: string) {
-    return { tenantId, settings: 'data settings tenant' };
+    return this.tenantsService.getSettings(tenantId); 
   }
 
   @UseGuards(JwtAuthGuard, TenantGuard)

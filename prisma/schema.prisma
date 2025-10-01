@@ -140,6 +140,7 @@ model TenantTheme {
   mode      ThemeMode? @default(SYSTEM)
   density   Density?   @default(COMFORTABLE)
   font      String? // "Inter", "IBM Plex Sans" (opsional)
+  accessibility Json?
   updatedAt DateTime   @updatedAt
 }
 
