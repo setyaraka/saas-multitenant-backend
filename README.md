@@ -91,7 +91,7 @@ model TenantConfig {
 ### Membership
 - GET /memberships/me → list tenants and roles for the current user.
 
-## ▶️ Getting Started
+## Getting Started
 
 ### Clone repo & install dependencies:
 ```
