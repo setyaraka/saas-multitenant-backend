@@ -1,6 +1,9 @@
 import { SetMetadata } from '@nestjs/common';
+
+type PermOpt = 'USERS_MANAGE' | 'MENU_MANAGE' | 'ORDERS_READ' | 'ORDERS_UPDATE';
+
 export const RequirePerm = (
-  perm: 'USERS_MANAGE' | 'MENU_MANAGE' | 'ORDERS_READ' | 'ORDERS_UPDATE',
+  perm: PermOpt,
 ) => SetMetadata('perm', perm);
 
 import {

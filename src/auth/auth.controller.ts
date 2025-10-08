@@ -12,20 +12,19 @@ import { AuthService } from './auth.service';
 import { RoleCode } from '@prisma/client';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+interface RegisterBody {
+  email: string;
+  password: string;
+  tenantKey: string;
+  role: RoleCode;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('register')
-  register(
-    @Body()
-    body: {
-      email: string;
-      password: string;
-      tenantKey: string;
-      role: RoleCode;
-    },
-  ) {
+  register(@Body() body: RegisterBody) {
     return this.auth.register(body);
   }
 
