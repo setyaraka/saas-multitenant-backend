@@ -22,14 +22,14 @@ export class PermGuard implements CanActivate {
   ) {}
   async canActivate(ctx: ExecutionContext) {
     const perm = this.refl.get<string>('perm', ctx.getHandler());
-    if (!perm) return true;
+  if (!perm) return true;
     const req = ctx.switchToHttp().getRequest();
     const { tenantId, role } = req.user || {};
     if (!tenantId || !role) throw new ForbiddenException('No tenant context');
     const ok = await this.prisma.tenantRolePermission.findUnique({
-      where: { tenantId_role_perm: { tenantId, role, perm: perm as any } },
+      where: { tenantId_role_perm: { tenantId, role, perm: perm as PermOpt } },
     });
-    if (!ok) throw new ForbiddenException('Insufficient permission');
+    if (!ok && role !== "OWNER") throw new ForbiddenException('Insufficient permission');
     return true;
   }
 }
