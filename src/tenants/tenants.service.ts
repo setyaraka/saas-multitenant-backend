@@ -4,6 +4,8 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { DnsStatus, Prisma, RoleCode } from '@prisma/client';
 import { UpdateAppearanceDto } from './dto/update-appearance.dto';
+import { UpdateDomainDto } from './dto/update-domain.dto';
+import { UpdateIntegrationDto } from './dto/update-integration-dto';
 
 @Injectable()
 export class TenantsService {
@@ -153,7 +155,7 @@ export class TenantsService {
 
   async updateDomain(
     tenantId: string,
-    dto: { domain?: string; autoHttps?: boolean },
+    dto: UpdateDomainDto,
   ) {
     const existing = await this.prisma.tenantDomain.findUnique({
       where: { tenantId },
@@ -191,6 +193,23 @@ export class TenantsService {
     return { ...dataSetting, dnsStatus: data.dnsStatus };
   }
 
+  async updateIntegration(tenantId: string, dto: UpdateIntegrationDto,) {
+    const meta: Prisma.InputJsonValue = this.stripUndefined(dto);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantIntegrations.upsert({
+        where: { tenantId },
+        create: { tenantId, ...dto },
+        update: { ...dto },
+      });
+      await tx.auditLog.create({
+        data: { tenantId, action: 'SETTINGS.INTEGRATION.UPDATE', meta },
+      });
+    });
+
+    return this.getSettings(tenantId);
+  }
+
   async updateLogoUrl(tenantId: string, logoUrl: string) {
     await this.prisma.$transaction(async (tx) => {
       await tx.tenantBrand.upsert({
@@ -214,9 +233,10 @@ export class TenantsService {
     const t = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       include: {
-        brand: true, theme: true, i18n: true, domain: true,
+        brand: true, theme: true, i18n: true, domain: true, integrations: true
       },
     });
+
     if (!t) throw new NotFoundException('Tenant not found');
   
     const dom = t.domain;
@@ -247,6 +267,11 @@ export class TenantsService {
       },
       domain,
       logoUrl: t.brand?.logoUrl ?? null,
+      integration: {
+        slackEnabled: t.integrations?.slackEnabled ?? null,
+        zapierEnabled: t.integrations?.zapierEnabled ?? null,
+        webhookUrl: t.integrations?.webhookUrl ?? null
+      }
     };
   }
 }

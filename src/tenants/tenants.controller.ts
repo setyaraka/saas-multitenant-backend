@@ -27,6 +27,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import * as fs from 'fs';
 import path from 'path';
 import { diskStorage } from 'multer';
+import { UpdateIntegrationDto } from './dto/update-integration-dto';
 
 @Controller('tenants')
 export class TenantsController {
@@ -98,6 +99,16 @@ export class TenantsController {
     @Body() dto: UpdateDomainDto,
   ) {
     return this.tenantsService.updateDomain(tenantId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, TenantGuard, PermGuard)
+  @Patch(':tenantId/settings/integration')
+  @RequirePerm('USERS_MANAGE')
+  updateIntegration(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: UpdateIntegrationDto,
+  ) {
+    return this.tenantsService.updateIntegration(tenantId, dto);
   }
 
   @UseGuards(JwtAuthGuard, TenantGuard, PermGuard)
