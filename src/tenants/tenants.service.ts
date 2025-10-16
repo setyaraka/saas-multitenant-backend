@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -7,6 +7,8 @@ import { UpdateAppearanceDto } from './dto/update-appearance.dto';
 import { UpdateDomainDto } from './dto/update-domain.dto';
 import { UpdateIntegrationDto } from './dto/update-integration-dto';
 import { Me } from './types';
+import { UpdateMeDto } from './dto/update-me.dto';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class TenantsService {
@@ -209,6 +211,49 @@ export class TenantsService {
     });
 
     return this.getSettings(tenantId);
+  }
+
+  async updateMe(tenantId: string, userId: string, dto: UpdateMeDto) {
+    const membership = await this.prisma.membership.findUnique({
+      where: { userId_tenantId: { userId, tenantId } },
+      select: { id: true, userId: true },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this tenant');
+    }
+  
+    const data = this.stripUndefined({
+      name: dto.name,
+      email: dto.email,
+    });
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+  
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data,
+        });
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            actorId: userId,
+            action: 'USER.ME.UPDATE',
+            meta: data,
+          },
+        });
+      });
+    } catch (e) {
+      if (e instanceof PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new BadRequestException('Email is already in use');
+      }
+      throw e;
+    }
+    return this.getSettings(tenantId, userId);
   }
 
   async updateLogoUrl(tenantId: string, logoUrl: string) {

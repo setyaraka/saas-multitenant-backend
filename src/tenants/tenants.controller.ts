@@ -29,6 +29,7 @@ import path from 'path';
 import { diskStorage } from 'multer';
 import { UpdateIntegrationDto } from './dto/update-integration-dto';
 import { SettingRequest } from './types';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 @Controller('tenants')
 export class TenantsController {
@@ -110,6 +111,16 @@ export class TenantsController {
     @Body() dto: UpdateIntegrationDto,
   ) {
     return this.tenantsService.updateIntegration(tenantId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':tenantId/settings/profile')
+  async updateMe(
+    @Param('tenantId') tenantId: string,
+    @Req() req: SettingRequest,
+    @Body() dto: UpdateMeDto,
+  ) {
+    return this.tenantsService.updateMe(tenantId, req.user.userId, dto);
   }
 
   @UseGuards(JwtAuthGuard, TenantGuard, PermGuard)
