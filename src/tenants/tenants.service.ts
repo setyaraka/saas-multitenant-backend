@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -6,6 +6,7 @@ import { DnsStatus, Prisma, RoleCode } from '@prisma/client';
 import { UpdateAppearanceDto } from './dto/update-appearance.dto';
 import { UpdateDomainDto } from './dto/update-domain.dto';
 import { UpdateIntegrationDto } from './dto/update-integration-dto';
+import { Me } from './types';
 
 @Injectable()
 export class TenantsService {
@@ -229,7 +230,7 @@ export class TenantsService {
     return { ...dataSetting, logoUrl };
   }
 
-  async getSettings(tenantId: string) {
+  async getSettings(tenantId: string, userId?: string) {
     const t = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       include: {
@@ -238,6 +239,23 @@ export class TenantsService {
     });
 
     if (!t) throw new NotFoundException('Tenant not found');
+
+    let me: Me | null = null;
+
+    if (userId) {
+      const membership = await this.prisma.membership.findUnique({
+        where: { userId_tenantId: { userId: userId, tenantId } },
+        include: { user: { select: { email: true, name: true } } },
+      });
+
+      if (!membership) {
+        throw new ForbiddenException('You are not a member of this tenant');
+      }
+      me = {
+        email: membership.user.email,
+        name: membership.user.name ?? null
+      }
+    }
   
     const dom = t.domain;
     const domain = dom ? {
@@ -249,7 +267,7 @@ export class TenantsService {
       autoHttps: dom.autoHttps,
       verifiedAt: dom.verifiedAt,
     } : null;
-  
+
     return {
       appearance: {
         brandName: t.brand?.brandName ?? null,
@@ -271,7 +289,8 @@ export class TenantsService {
         slackEnabled: t.integrations?.slackEnabled ?? null,
         zapierEnabled: t.integrations?.zapierEnabled ?? null,
         webhookUrl: t.integrations?.webhookUrl ?? null
-      }
+      },
+      users: me
     };
   }
 }

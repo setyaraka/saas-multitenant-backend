@@ -28,6 +28,7 @@ import * as fs from 'fs';
 import path from 'path';
 import { diskStorage } from 'multer';
 import { UpdateIntegrationDto } from './dto/update-integration-dto';
+import { SettingRequest } from './types';
 
 @Controller('tenants')
 export class TenantsController {
@@ -61,13 +62,13 @@ export class TenantsController {
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles('OWNER', 'ADMIN')
   @Get(':tenantId/settings')
-  getTenantSettings(@Param('tenantId') tenantId: string) {
-    return this.tenantsService.getSettings(tenantId); 
+  getTenantSettings(@Param('tenantId') tenantId: string, @Req() req: SettingRequest) {
+    return this.tenantsService.getSettings(tenantId, req.user.userId); 
   }
 
   @UseGuards(JwtAuthGuard, TenantGuard)
   @Patch(':tenantId/settings/appearance')
-  @RequirePerm('USERS_MANAGE') // lihat poin 3
+  @RequirePerm('USERS_MANAGE')
   updateAppearance(
     @Param('tenantId') tenantId: string,
     @Body() dto: UpdateAppearanceDto,
