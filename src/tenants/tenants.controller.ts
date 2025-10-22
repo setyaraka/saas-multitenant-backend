@@ -30,6 +30,7 @@ import { diskStorage } from 'multer';
 import { UpdateIntegrationDto } from './dto/update-integration-dto';
 import { SettingRequest } from './types';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { UpdateAccessibilityDto } from './dto/update-accessibility';
 
 @Controller('tenants')
 export class TenantsController {
@@ -121,6 +122,16 @@ export class TenantsController {
     @Body() dto: UpdateMeDto,
   ) {
     return this.tenantsService.updateMe(tenantId, req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, TenantGuard, PermGuard)
+  @Patch(':tenantId/settings/accessibility')
+  @RequirePerm('USERS_MANAGE')
+  updateAccessibility(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: UpdateAccessibilityDto,
+  ) {
+    return this.tenantsService.updateAccessibility(tenantId, dto);
   }
 
   @UseGuards(JwtAuthGuard, TenantGuard, PermGuard)

@@ -9,6 +9,7 @@ import { UpdateIntegrationDto } from './dto/update-integration-dto';
 import { Me } from './types';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { UpdateAccessibilityDto } from './dto/update-accessibility';
 
 @Injectable()
 export class TenantsService {
@@ -213,6 +214,28 @@ export class TenantsService {
     return this.getSettings(tenantId);
   }
 
+  async updateAccessibility(tenantId: string, dto: UpdateAccessibilityDto,) {
+    const meta: Prisma.InputJsonValue = this.stripUndefined(dto);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantTheme.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          accessibility: meta,
+        },
+        update: {
+          accessibility: meta,
+        },
+      });
+      await tx.auditLog.create({
+        data: { tenantId, action: 'SETTINGS.ACCESSIBILITY.UPDATE', meta },
+      });
+    });
+
+    return this.getSettings(tenantId);
+  }
+
   async updateMe(tenantId: string, userId: string, dto: UpdateMeDto) {
     const membership = await this.prisma.membership.findUnique({
       where: { userId_tenantId: { userId, tenantId } },
@@ -335,7 +358,8 @@ export class TenantsService {
         zapierEnabled: t.integrations?.zapierEnabled ?? null,
         webhookUrl: t.integrations?.webhookUrl ?? null
       },
-      users: me
+      users: me,
+      accessibility: t.theme?.accessibility
     };
   }
 }
